@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PDF前端--電子蓋章</title>
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/ui/1.12.0/jquery-ui.min.js" integrity="sha256-eGE6blurk5sHj+rmkfsGYeKyZx3M4bG+ZlFyA7Kns7E=" crossorigin="anonymous"></script>
+  <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.6/themes/cupertino/jquery-ui.css" />
+</head>
+<body>
+
+
+<div>
+  <button id="prev">上一頁</button>
+  <button id="next">下一頁</button>
+  &nbsp; &nbsp;
+  <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+</div>
+
+<div id="pdf-area" style="width: 1000px">
+  <canvas id="the-canvas" style="border:1px solid black"></canvas>
+
+
+  <div id="rnd" style="display:inline-block">
+    <img id="img_rnd" style="border:1px solid red;width: 200px" src="https://www.google.com.tw/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png" />
+  </div>
+
+</div>
+
+<script src="../../build/pdf.js"></script>
+<script src="../../web/compatibility.js"></script>
+<script id="script">
+   //路徑
+ var url = '08dpc1110_TC.pdf';
+   //var url = 'compressed.tracemonkey-pldi-09.pdf';
+   //var url = 'gr_ct.pdf';
+  var pdfDoc = null,
+      pageNum = 1,//欲觀看頁數
+      pageRendering = false,
+      pageNumPending = null,
+      //scale =1.5,
+      canvas = document.getElementById('the-canvas'),
+      ctx = canvas.getContext('2d');
+
+
+  function renderPage(num) {
+    pageRendering = true;
+    pdfDoc.getPage(num).then(function(page) {
+
+
+      // var viewport = page.getViewport(scale);
+      //canvas.height  = scaledViewport.height ;
+     // canvas.width = scaledViewport.width ;
+      var desiredWidth = 600;
+      var viewport = page.getViewport(1);
+      var scale = desiredWidth / viewport.width;
+      var scaledViewport = page.getViewport(scale);
+      canvas.height  = 850;//viewport.height ;
+      canvas.width = 600;//viewport.width ;
+
+      // Render PDF page into canvas context
+      var renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+      };
+      var renderTask = page.render(renderContext);
+
+      // Wait for rendering to finish
+      renderTask.promise.then(function () {
+        pageRendering = false;
+        if (pageNumPending !== null) {
+          // New page rendering is pending
+          renderPage(pageNumPending);
+          pageNumPending = null;
+        }
+      });
+    });
+
+    // Update page counters
+    document.getElementById('page_num').textContent = pageNum;
+  }
+
+  /**
+   * If another page rendering in progress, waits until the rendering is
+   * finised. Otherwise, executes rendering immediately.
+   */
+  function queueRenderPage(num) {
+    if (pageRendering) {
+      pageNumPending = num;
+    } else {
+      renderPage(num);
+    }
+  }
+
+  /**
+   * 上一頁
+   */
+  function onPrevPage() {
+    if (pageNum <= 1) {
+      return;
+    }
+    pageNum--;
+    queueRenderPage(pageNum);
+  }
+  document.getElementById('prev').addEventListener('click', onPrevPage);
+
+  /**
+   * 下一頁
+   */
+  function onNextPage() {
+    if (pageNum >= pdfDoc.numPages) {
+      return;
+    }
+    pageNum++;
+    queueRenderPage(pageNum);
+  }
+  document.getElementById('next').addEventListener('click', onNextPage);
+
+   PDFJS.workerSrc = '../../build/pdf.worker.js';
+  /**
+   * 設定PDF
+   */
+  PDFJS.getDocument(url).then(function (pdfDoc_) {
+    pdfDoc = pdfDoc_;
+    document.getElementById('page_count').textContent = pdfDoc.numPages;
+
+    // Initial/first page rendering
+    renderPage(pageNum);
+  });
+
+
+//---------------------------------
+  //圖片
+   $('#rnd').draggable({
+     containment: '#pdf-area',
+     start: function(event, ui) {
+       //isDraggingMedia = true;
+     },
+     stop: function(event, ui) {
+       //isDraggingMedia = false;
+       // blah
+
+       //console.log('top:'+$('#rnd').offset().top);
+       //  console.log('left:'+$('#rnd').offset().left);
+       var Stoppos = $(this).position();
+       $("div#stop").text("STOP: \nLeft: "+ Stoppos.left + "\nTop: " + Stoppos.top);
+     }
+   });
+</script>
+
+</body>
+</html>
